@@ -2,7 +2,7 @@
   "name": "todoo-vscode",
   "displayName": "Todoo - Odoo Test Runner",
   "description": "Run and debug Odoo tests directly from VS Code",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "sarkande",
   "engines": {
     "vscode": "^1.85.0"
@@ -15,6 +15,7 @@
     "onCommand:todoo.refreshTests",
     "onCommand:todoo.startServer",
     "onCommand:todoo.stopServer",
+    "onCommand:todoo.setupDebugConfig",
     "workspaceContains:**/__manifest__.py"
   ],
   "main": "./out/extension.js",
@@ -102,6 +103,10 @@
       {
         "command": "todoo.stopServer",
         "title": "Todoo: Stop Server"
+      },
+      {
+        "command": "todoo.setupDebugConfig",
+        "title": "Todoo: Setup Debug Config (launch.json)"
       }
     ]
   },

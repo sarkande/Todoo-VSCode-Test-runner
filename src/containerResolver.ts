@@ -4,11 +4,17 @@ import * as fs from "fs";
 import { execFile } from "child_process";
 import { TodooClient } from "./todooClient";
 
-interface ComposeContainer {
+export interface ComposeContainer {
   id: string;
   name: string;
   service: string;
   state: string;
+}
+
+export interface DebugInfo {
+  containerId: string;
+  containerName: string;
+  hostPort: number;
 }
 
 const COMPOSE_FILENAMES = [
@@ -25,7 +31,6 @@ export function findComposeFile(): string | null {
   for (const folder of folders) {
     let dir = folder.uri.fsPath;
 
-    // Walk up to 5 levels
     for (let i = 0; i < 5; i++) {
       for (const name of COMPOSE_FILENAMES) {
         const candidate = path.join(dir, name);
@@ -52,7 +57,9 @@ export async function getComposeContainers(
       { timeout: 10000 },
       (err, stdout, stderr) => {
         if (err) {
-          reject(new Error(`docker compose ps failed: ${stderr || err.message}`));
+          reject(
+            new Error(`docker compose ps failed: ${stderr || err.message}`)
+          );
           return;
         }
 
@@ -85,8 +92,59 @@ export function pickTargetContainer(
   preferredService: string = "web"
 ): ComposeContainer | null {
   const running = containers.filter((c) => c.state === "running");
-  const match = running.find((c) => c.service === preferredService);
-  return match ?? null;
+  return running.find((c) => c.service === preferredService) ?? null;
+}
+
+/**
+ * Get the host port mapped to an internal container port via `docker port`.
+ */
+export async function getHostPort(
+  containerName: string,
+  internalPort: number
+): Promise<number | null> {
+  return new Promise((resolve) => {
+    execFile(
+      "docker",
+      ["port", containerName, String(internalPort)],
+      { timeout: 5000 },
+      (err, stdout) => {
+        if (err || !stdout.trim()) {
+          resolve(null);
+          return;
+        }
+        // Output format: "0.0.0.0:5831" or ":::5831"
+        const match = stdout.trim().match(/:(\d+)$/m);
+        resolve(match ? parseInt(match[1], 10) : null);
+      }
+    );
+  });
+}
+
+/**
+ * Resolve the debug container and its debugpy host port.
+ */
+export async function resolveDebugInfo(
+  debugService: string = "debug"
+): Promise<DebugInfo | null> {
+  const composeFile = findComposeFile();
+  if (!composeFile) return null;
+
+  try {
+    const containers = await getComposeContainers(composeFile);
+    const debugContainer = pickTargetContainer(containers, debugService);
+    if (!debugContainer) return null;
+
+    const hostPort = await getHostPort(debugContainer.name, 5678);
+    if (!hostPort) return null;
+
+    return {
+      containerId: debugContainer.id,
+      containerName: debugContainer.name,
+      hostPort,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function autoResolveContainer(

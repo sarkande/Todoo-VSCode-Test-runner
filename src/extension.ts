@@ -1,7 +1,9 @@
 import * as vscode from "vscode";
+import * as fs from "fs";
+import * as path from "path";
 import { TodooTestController } from "./testController";
 import { ServerManager } from "./serverManager";
-import { autoResolveContainer } from "./containerResolver";
+import { autoResolveContainer, resolveDebugInfo, findComposeFile } from "./containerResolver";
 import { TodooConfig } from "./types";
 
 let testController: TodooTestController | undefined;
@@ -38,6 +40,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       await testController.discoverTests();
     }
   }
+
+  // Auto-generate launch.json with correct debug port
+  await generateLaunchConfig();
 
   context.subscriptions.push(
     vscode.commands.registerCommand("todoo.refreshTests", async () => {
@@ -92,6 +97,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       serverManager?.stop();
     }),
 
+    vscode.commands.registerCommand("todoo.setupDebugConfig", async () => {
+      await generateLaunchConfig();
+    }),
+
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("todoo")) {
         testController?.updateConfig(getConfig());
@@ -99,6 +108,102 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
 
     { dispose: () => serverManager?.dispose() }
+  );
+}
+
+async function generateLaunchConfig(): Promise<void> {
+  const debugInfo = await resolveDebugInfo("debug");
+  if (!debugInfo) {
+    vscode.window.showWarningMessage(
+      "Todoo: Could not detect debug container port. Is the debug service running?"
+    );
+    return;
+  }
+
+  // Find the project root (where docker-compose.yml is)
+  const composeFile = findComposeFile();
+  if (!composeFile) return;
+  const projectRoot = path.dirname(composeFile);
+  const vscodePath = path.join(projectRoot, ".vscode");
+  const launchPath = path.join(vscodePath, "launch.json");
+
+  // Build path mappings from workspace
+  const mappings: Array<{ localRoot: string; remoteRoot: string }> = [];
+  const folders = vscode.workspace.workspaceFolders ?? [];
+  for (const folder of folders) {
+    const name = folder.name.toLowerCase();
+    if (
+      name.includes("custom") ||
+      name.includes("extra-addons") ||
+      name.includes("addons")
+    ) {
+      mappings.push({
+        localRoot: folder.uri.fsPath,
+        remoteRoot: "/mnt/extra-addons",
+      });
+    } else if (name === "odoo") {
+      mappings.push({
+        localRoot: folder.uri.fsPath,
+        remoteRoot: "/usr/lib/python3/dist-packages/odoo",
+      });
+    } else if (name === "enterprise") {
+      mappings.push({
+        localRoot: folder.uri.fsPath,
+        remoteRoot: "/mnt/enterprise",
+      });
+    }
+  }
+
+  if (mappings.length === 0) {
+    mappings.push({
+      localRoot: "${workspaceFolder}",
+      remoteRoot: "/mnt/extra-addons",
+    });
+  }
+
+  const todooConfig = {
+    name: "Todoo: Remote Attach",
+    type: "debugpy",
+    request: "attach",
+    connect: {
+      host: "localhost",
+      port: debugInfo.hostPort,
+    },
+    pathMappings: mappings,
+    justMyCode: true,
+  };
+
+  if (!fs.existsSync(vscodePath)) {
+    fs.mkdirSync(vscodePath, { recursive: true });
+  }
+
+  let launch: any;
+  if (fs.existsSync(launchPath)) {
+    try {
+      const raw = fs.readFileSync(launchPath, "utf-8");
+      // Strip comments for JSON parsing (simple approach)
+      const stripped = raw.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+      launch = JSON.parse(stripped);
+    } catch {
+      launch = { version: "0.2.0", configurations: [] };
+    }
+  } else {
+    launch = { version: "0.2.0", configurations: [] };
+  }
+
+  // Update or add the Todoo config
+  const idx = launch.configurations.findIndex(
+    (c: any) => c.name === "Todoo: Remote Attach"
+  );
+  if (idx >= 0) {
+    launch.configurations[idx] = todooConfig;
+  } else {
+    launch.configurations.push(todooConfig);
+  }
+
+  fs.writeFileSync(launchPath, JSON.stringify(launch, null, 2) + "\n");
+  vscode.window.showInformationMessage(
+    `Todoo: launch.json updated with debug port ${debugInfo.hostPort}`
   );
 }
 

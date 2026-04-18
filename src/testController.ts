@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { TodooClient } from "./todooClient";
+import { resolveDebugInfo } from "./containerResolver";
 import { ModuleInfo, TestResult, TodooConfig } from "./types";
 
 export class TodooTestController {
@@ -310,7 +311,6 @@ export class TodooTestController {
   ): Promise<void> {
     const run = this.ctrl.createTestRun(request);
     const config = vscode.workspace.getConfiguration("todoo");
-    const debugPort = config.get<number>("debugPort", 5678);
 
     const running = await this.client.isServerRunning();
     if (!running) {
@@ -318,6 +318,23 @@ export class TodooTestController {
       run.end();
       return;
     }
+
+    // Resolve debug container and host port
+    const debugInfo = await resolveDebugInfo("debug");
+    if (!debugInfo) {
+      vscode.window.showErrorMessage(
+        "Todoo: Could not find debug container or its debugpy port. " +
+          "Make sure the 'debug' service is running in docker-compose."
+      );
+      run.end();
+      return;
+    }
+
+    // Switch to debug container for test execution
+    await this.client.selectContainer(debugInfo.containerId);
+    this.outputChannel.info(
+      `Switched to debug container '${debugInfo.containerName}' (port ${debugInfo.hostPort})`
+    );
 
     const testTags = this.resolveTestTags(request);
     if (!testTags) {
@@ -339,7 +356,7 @@ export class TodooTestController {
       http_port: config.get<number>("odooPort", 8070),
       with_coverage: false,
       debug: true,
-      debug_port: debugPort,
+      debug_port: 5678, // internal container port, always 5678
     };
 
     this.outputChannel.info(`Debug: ${testTags}`);
@@ -357,15 +374,15 @@ export class TodooTestController {
           onResult: (result) => {
             this.handleTestResult(run, result, activeItems);
           },
-          onDebugReady: async (port) => {
+          onDebugReady: async () => {
             const pathMappings = this.buildPathMappings();
             await vscode.debug.startDebugging(undefined, {
               name: "Todoo: Debug Odoo Test",
               type: "debugpy",
               request: "attach",
               connect: {
-                host: config.get<string>("serverHost", "127.0.0.1"),
-                port: port,
+                host: "localhost",
+                port: debugInfo.hostPort,
               },
               pathMappings: pathMappings,
               justMyCode: true,
@@ -377,12 +394,15 @@ export class TodooTestController {
                 `${summary?.passed ?? 0} passed, ${summary?.failed ?? 0} failed, ` +
                 `${summary?.errors ?? 0} errors`
             );
+            // Switch back to web container
+            this.switchBackToWeb(config);
           },
           onError: (message) => {
             this.outputChannel.error(message);
             for (const item of includedItems) {
               run.errored(item, new vscode.TestMessage(message));
             }
+            this.switchBackToWeb(config);
           },
         },
         token
@@ -390,9 +410,22 @@ export class TodooTestController {
     } catch (err: any) {
       this.outputChannel.error(`Connection error: ${err.message}`);
       vscode.window.showErrorMessage(`Todoo: ${err.message}`);
+      this.switchBackToWeb(config);
     }
 
     run.end();
+  }
+
+  private async switchBackToWeb(
+    config: vscode.WorkspaceConfiguration
+  ): Promise<void> {
+    try {
+      const { autoResolveContainer } = await import("./containerResolver");
+      const preferred = config.get<string>("preferredService", "web");
+      await autoResolveContainer(this.client, preferred);
+    } catch {
+      // silent fallback
+    }
   }
 
   private buildPathMappings(): Array<{
