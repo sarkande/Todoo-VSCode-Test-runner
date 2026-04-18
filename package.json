@@ -1,0 +1,106 @@
+{
+  "name": "todoo-vscode",
+  "displayName": "Todoo - Odoo Test Runner",
+  "description": "Run and debug Odoo tests directly from VS Code",
+  "version": "0.2.2",
+  "publisher": "sarkande",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Testing"
+  ],
+  "activationEvents": [
+    "onCommand:todoo.selectContainer",
+    "onCommand:todoo.refreshTests",
+    "onCommand:todoo.startServer",
+    "onCommand:todoo.stopServer",
+    "workspaceContains:**/__manifest__.py"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Todoo",
+      "properties": {
+        "todoo.serverHost": {
+          "type": "string",
+          "default": "127.0.0.1",
+          "description": "Todoo server host"
+        },
+        "todoo.serverPort": {
+          "type": "number",
+          "default": 8080,
+          "description": "Todoo server port"
+        },
+        "todoo.container": {
+          "type": "string",
+          "default": "",
+          "description": "Docker container name or ID"
+        },
+        "todoo.dbName": {
+          "type": "string",
+          "default": "odoo",
+          "description": "Odoo database name"
+        },
+        "todoo.dbHost": {
+          "type": "string",
+          "default": "db",
+          "description": "Database host"
+        },
+        "todoo.dbPassword": {
+          "type": "string",
+          "default": "odoo",
+          "description": "Database password"
+        },
+        "todoo.odooPort": {
+          "type": "number",
+          "default": 8070,
+          "description": "Odoo HTTP port inside the container"
+        },
+        "todoo.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically start todoo server when running tests"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "todoo.refreshTests",
+        "title": "Todoo: Refresh Tests"
+      },
+      {
+        "command": "todoo.selectContainer",
+        "title": "Todoo: Select Docker Container"
+      },
+      {
+        "command": "todoo.startServer",
+        "title": "Todoo: Start Server"
+      },
+      {
+        "command": "todoo.stopServer",
+        "title": "Todoo: Stop Server"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --sourcemap",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@types/ws": "^8.5.10",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "esbuild": "^0.28.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}
