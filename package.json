@@ -2,7 +2,7 @@
   "name": "todoo-vscode",
   "displayName": "Todoo - Odoo Test Runner",
   "description": "Run and debug Odoo tests directly from VS Code",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "publisher": "sarkande",
   "engines": {
     "vscode": "^1.85.0"
@@ -61,6 +61,28 @@
           "type": "boolean",
           "default": true,
           "description": "Automatically start todoo server when running tests"
+        },
+        "todoo.preferredService": {
+          "type": "string",
+          "default": "web",
+          "description": "Docker Compose service name to auto-select for testing"
+        },
+        "todoo.debugPort": {
+          "type": "number",
+          "default": 5678,
+          "description": "Port for debugpy inside the container"
+        },
+        "todoo.pathMappings": {
+          "type": "array",
+          "default": [],
+          "description": "Custom path mappings for debug (localRoot -> remoteRoot). Auto-detected if empty.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "localRoot": { "type": "string" },
+              "remoteRoot": { "type": "string" }
+            }
+          }
         }
       }
     },

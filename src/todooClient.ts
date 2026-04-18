@@ -67,6 +67,7 @@ export class TodooClient {
       onResult?: (result: TestResult) => void;
       onComplete?: (status: string, summary: any) => void;
       onError?: (message: string) => void;
+      onDebugReady?: (port: number) => void;
     },
     token?: vscode.CancellationToken
   ): Promise<void> {
@@ -95,6 +96,9 @@ export class TodooClient {
             callbacks.onComplete?.(msg.status!, msg.summary);
             ws.close();
             resolve();
+            break;
+          case "debug_ready":
+            callbacks.onDebugReady?.(msg.port!);
             break;
           case "error":
             callbacks.onError?.(msg.message!);

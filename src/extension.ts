@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { TodooTestController } from "./testController";
 import { ServerManager } from "./serverManager";
+import { autoResolveContainer } from "./containerResolver";
 import { TodooConfig } from "./types";
 
 let testController: TodooTestController | undefined;
@@ -17,14 +18,26 @@ function getConfig(): TodooConfig {
     dbPassword: cfg.get("dbPassword", "odoo"),
     odooPort: cfg.get("odooPort", 8070),
     autoStart: cfg.get("autoStart", true),
+    preferredService: cfg.get("preferredService", "web"),
+    debugPort: cfg.get("debugPort", 5678),
   };
 }
 
-export function activate(context: vscode.ExtensionContext): void {
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const config = getConfig();
 
   serverManager = new ServerManager();
   testController = new TodooTestController(context, config);
+
+  // Auto-resolve container from docker-compose
+  const client = testController.getClient();
+  const serverRunning = await client.isServerRunning();
+  if (serverRunning) {
+    const resolved = await autoResolveContainer(client, config.preferredService);
+    if (resolved) {
+      await testController.discoverTests();
+    }
+  }
 
   context.subscriptions.push(
     vscode.commands.registerCommand("todoo.refreshTests", async () => {

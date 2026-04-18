@@ -7,6 +7,8 @@ export interface TodooConfig {
   dbPassword: string;
   odooPort: number;
   autoStart: boolean;
+  preferredService: string;
+  debugPort: number;
 }
 
 export interface TestFile {
@@ -44,12 +46,13 @@ export interface TestSummary {
 }
 
 export interface WsMessage {
-  type: "log" | "test_result" | "complete" | "error";
+  type: "log" | "test_result" | "complete" | "error" | "debug_ready";
   line?: string;
   result?: TestResult;
   status?: string;
   summary?: TestSummary;
   message?: string;
+  port?: number;
 }
 
 export interface ContainerInfo {
@@ -66,4 +69,6 @@ export interface TestParams {
   db_password: string;
   http_port: number;
   with_coverage: boolean;
+  debug?: boolean;
+  debug_port?: number;
 }
