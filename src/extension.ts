@@ -41,8 +41,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
   }
 
-  // Auto-generate launch.json with correct debug port
-  await generateLaunchConfig();
+  // Auto-generate launch.json with correct debug port (silent at activation)
+  await generateLaunchConfig(true);
 
   context.subscriptions.push(
     vscode.commands.registerCommand("todoo.refreshTests", async () => {
@@ -111,12 +111,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   );
 }
 
-async function generateLaunchConfig(): Promise<void> {
+async function generateLaunchConfig(silent: boolean = false): Promise<void> {
   const debugInfo = await resolveDebugInfo("debug");
   if (!debugInfo) {
-    vscode.window.showWarningMessage(
-      "Todoo: Could not detect debug container port. Is the debug service running?"
-    );
+    if (!silent) {
+      vscode.window.showWarningMessage(
+        "Todoo: Could not detect debug container port. Is the debug service running?"
+      );
+    }
     return;
   }
 

@@ -2,7 +2,7 @@
   "name": "todoo-vscode",
   "displayName": "Todoo - Odoo Test Runner",
   "description": "Run and debug Odoo tests directly from VS Code",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "publisher": "sarkande",
   "engines": {
     "vscode": "^1.85.0"
